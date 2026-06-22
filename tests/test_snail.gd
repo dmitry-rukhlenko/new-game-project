@@ -134,6 +134,55 @@ func _initialize():
 		"The snail should use normal arrow movement again when it returns to the launch cell."
 	)
 
+	var disconnected_target_cell = (
+		diagonal_start_cell +
+		Vector2i(0, -1)
+	)
+
+	main.snail_trail_cells.clear()
+	main.add_snail_trail_cell(
+		diagonal_start_cell
+	)
+	main.add_snail_trail_cell(
+		diagonal_start_cell + Vector2i(1, 0)
+	)
+	main.add_snail_trail_cell(
+		disconnected_target_cell
+	)
+	main.player.position = main.position_for_cell(
+		diagonal_start_cell
+	)
+
+	var moved_to_disconnected_cell = main.move_snail_on_trail(
+		Vector2i(0, -1)
+	)
+
+	_assert_snail_rule(
+		not moved_to_disconnected_cell,
+		"The snail should not move to a nearby trail cell unless the drawn trail connects to it."
+	)
+
+	_assert_snail_rule(
+		main.cell_for_position(main.player.position) == diagonal_start_cell,
+		"The snail should stay in place when the requested trail cell is disconnected."
+	)
+
+	main.player.position = (
+		trail_start +
+		Vector2(0.0, -main.CELL)
+	)
+	main.snail_launch_start_position = trail_start
+	main.snail_first_launch_recorded = false
+	main.velocity = Vector2.ZERO
+	main.moves = 3
+	main.game_over = false
+	main.finish_turn()
+
+	_assert_snail_rule(
+		main.cell_for_position(main.player.position) == main.cell_for_position(trail_start),
+		"The snail should return to the launch cell after the flying turn ends."
+	)
+
 	main.queue_free()
 	quit(1 if failed else 0)
 

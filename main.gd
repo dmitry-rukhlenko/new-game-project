@@ -2589,11 +2589,14 @@ func finish_turn():
 
 		return
 
-	if (
-		current_character != PLAYER_5
-		and
-		current_character != PLAYER_10
-	):
+	if current_character == PLAYER_10:
+
+		# After the flying part ends, the snail returns to the exact place
+		# where this launch started. From there, the player can either follow
+		# the trail or move horizontally again to choose another launch point.
+		player.position = snail_launch_start_position
+
+	elif current_character != PLAYER_5:
 
 		player.position = Vector2(
 			PLAYER_START_X,
@@ -3936,17 +3939,13 @@ func move_snail_on_trail(direction: Vector2i) -> bool:
 		player.position
 	)
 
-	var target_cell = current_cell + direction
+	var target_cell = get_snail_directional_trail_neighbor(
+		current_cell,
+		direction
+	)
 
-	if not snail_trail_cells.has(target_cell):
-
-		target_cell = get_snail_directional_trail_neighbor(
-			current_cell,
-			direction
-		)
-
-		if target_cell == null:
-			return false
+	if target_cell == null:
+		return false
 
 	player.position = position_for_cell(
 		target_cell
@@ -3995,6 +3994,9 @@ func get_snail_directional_trail_neighbor(
 			current_cell
 		)
 
+		if not is_snail_trail_step_connected(step):
+			continue
+
 		var score = get_snail_trail_step_score(
 			step,
 			direction
@@ -4006,6 +4008,20 @@ func get_snail_directional_trail_neighbor(
 			best_cell = neighbor_cell
 
 	return best_cell
+
+
+func is_snail_trail_step_connected(step: Vector2i) -> bool:
+
+	# A visible trail segment connects only neighboring cells. If two trail
+	# cells are close in the array but not adjacent on the board, moving between
+	# them would look like a jump through empty floor without a trail strip.
+	return (
+		step != Vector2i.ZERO
+		and
+		abs(step.x) <= 1
+		and
+		abs(step.y) <= 1
+	)
 
 
 func get_snail_trail_step_score(
