@@ -127,6 +127,8 @@ var mouse_pos := Vector2.ZERO
 
 var drag_start := Vector2.ZERO
 
+var drag_launch_position := Vector2.ZERO
+
 var turn_active = false
 
 var score := 0
@@ -1408,7 +1410,7 @@ func show_trajectory():
 	)
 
 	var dy = (
-		player.position.y -
+		drag_launch_position.y -
 		pos.y
 	)
 
@@ -1431,7 +1433,7 @@ func show_trajectory():
 		)
 
 	var tx = player.position.x
-	var ty = player.position.y
+	var ty = drag_launch_position.y
 
 	var tvx = dx * SHOT_POWER
 	var tvy = dy * SHOT_POWER
@@ -2189,6 +2191,9 @@ func _input(event):
 			get_global_mouse_position()
 		)
 
+		if dragging:
+			update_dragged_player_position()
+
 	if event is InputEventMouseButton:
 
 		if (
@@ -2270,60 +2275,97 @@ func _input(event):
 				pos.y <=
 				launch_pos.y + half_y
 
-			):
+				):
 
-				dragging = true
+					dragging = true
 
-		else:
+					drag_start = pos
 
-			if not dragging:
-				return
+					drag_launch_position = player.position
 
-			dragging = false
+			else:
 
-			hide_trajectory()
+				if not dragging:
+					return
 
-			var launch_pos = player.position
+				dragging = false
 
-			var dx = (
-				launch_pos.x -
-				mouse_pos.x
-			)
+				hide_trajectory()
 
-			var dy = (
-				launch_pos.y -
-				mouse_pos.y
-			)
+				var launch_origin = drag_launch_position
 
-			var dist = sqrt(
-				dx * dx +
-				dy * dy
-			)
-
-			if dist < 5:
-				return
-
-			if dist > MAX_PULL:
-
-				dx *= (
-					MAX_PULL / dist
+				var dx = (
+					player.position.x -
+					mouse_pos.x
 				)
 
-				dy *= (
-					MAX_PULL / dist
+				var dy = (
+					launch_origin.y -
+					mouse_pos.y
 				)
 
-			velocity = Vector2(
-				dx * SHOT_POWER,
-				dy * SHOT_POWER
-			)
+				var dist = sqrt(
+					dx * dx +
+					dy * dy
+				)
 
-			turn_active = true
+				if dist < 5:
+					return
 
-			moves -= 1
+				if dist > MAX_PULL:
 
-			update_move_icons()
-			
+					dx *= (
+						MAX_PULL / dist
+					)
+
+					dy *= (
+						MAX_PULL / dist
+					)
+
+				velocity = Vector2(
+					dx * SHOT_POWER,
+					dy * SHOT_POWER
+				)
+
+				turn_active = true
+
+				moves -= 1
+
+				update_move_icons()
+
+
+func update_dragged_player_position():
+
+	if player == null:
+		return
+
+	if current_character == PLAYER_8:
+		return
+
+	var dragged_x = (
+		drag_launch_position.x +
+		mouse_pos.x -
+		drag_start.x
+	)
+
+	var left_limit = (
+		LEFT_BORDER +
+		PLAYER_SIZE / 2
+	)
+
+	var right_limit = (
+		RIGHT_BORDER -
+		PLAYER_SIZE / 2
+	)
+
+	# Horizontal mouse dragging repositions the character before the shot.
+	# Vertical mouse movement is intentionally left for the slingshot pull.
+	player.position.x = clamp(
+		dragged_x,
+		left_limit,
+		right_limit
+	)
+				
 func create_floor():
 
 	var floors = [
