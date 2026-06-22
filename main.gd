@@ -48,6 +48,8 @@ const MIN_SPEED = 0.08
 
 const MAX_PULL = 180.0
 
+const DRAG_VERTICAL_DEAD_ZONE = 24.0
+
 const GORILLA_PUSH_POWER = 1.0
 
 const GORILLA_PUSH_PRE_COLLISION_SECONDS = 0.3
@@ -2346,6 +2348,9 @@ func update_dragged_player_position():
 	if current_character == PLAYER_8:
 		return
 
+	if not is_mouse_in_horizontal_drag_zone():
+		return
+
 	var left_limit = (
 		LEFT_BORDER +
 		PLAYER_SIZE / 2
@@ -2356,16 +2361,25 @@ func update_dragged_player_position():
 		PLAYER_SIZE / 2
 	)
 
-	# Horizontal mouse dragging repositions the character before the shot.
-	# It follows the cursor's X directly, even when the cursor is far above or
-	# below the character. Vertical mouse movement is intentionally left for the
-	# slingshot pull.
+	# Horizontal dragging is only active while the cursor stays close to the
+	# character's launch height. Pulling farther up or down switches control to
+	# the slingshot without moving the character at the last moment.
 	player.position.x = clamp(
 		mouse_pos.x,
 		left_limit,
 		right_limit
 	)
-				
+
+
+func is_mouse_in_horizontal_drag_zone() -> bool:
+
+	return (
+		abs(mouse_pos.y - drag_launch_position.y)
+		<=
+		DRAG_VERTICAL_DEAD_ZONE
+	)
+
+
 func create_floor():
 
 	var floors = [

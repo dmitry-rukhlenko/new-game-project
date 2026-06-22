@@ -25,17 +25,27 @@ func _initialize():
 	main.dragging = true
 	main.drag_start = start_position
 	main.drag_launch_position = start_position
-	main.mouse_pos = start_position + Vector2(120, 220)
+	main.mouse_pos = start_position + Vector2(120, 12)
 	main.update_dragged_player_position()
 
 	_assert_drag_rule(
 		main.player.position.x == main.mouse_pos.x,
-		"Horizontal mouse dragging should keep following the cursor even when it is far above or below the character."
+		"Horizontal mouse dragging should move a regular character while the cursor stays near the character center."
 	)
 
 	_assert_drag_rule(
 		main.player.position.y == start_position.y,
 		"Mouse dragging should not move the character vertically; vertical movement is slingshot pull."
+	)
+
+	var repositioned_x = main.player.position.x
+
+	main.mouse_pos = start_position + Vector2(180, 80)
+	main.update_dragged_player_position()
+
+	_assert_drag_rule(
+		main.player.position.x == repositioned_x,
+		"Horizontal mouse dragging should stop moving the character when the cursor leaves the vertical drag zone."
 	)
 
 	main.current_character = main.PLAYER_8
@@ -47,7 +57,7 @@ func _initialize():
 	main.dragging = true
 	main.drag_start = sparrow_position
 	main.drag_launch_position = sparrow_position
-	main.mouse_pos = sparrow_position + Vector2(120, 80)
+	main.mouse_pos = sparrow_position + Vector2(120, 12)
 	main.update_dragged_player_position()
 
 	_assert_drag_rule(
