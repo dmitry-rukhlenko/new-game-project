@@ -2062,40 +2062,22 @@ func _process(delta):
 			snail_first_launch_recorded
 		):
 
-			handle_snail_trail_input()
+			var moved_on_trail = handle_snail_trail_input()
+
+			if (
+				not moved_on_trail
+				and
+				is_snail_at_launch_cell()
+			):
+
+				handle_player_horizontal_movement(
+					delta
+				)
 
 		else:
 
-			var move_x = 0.0
-
-			if Input.is_action_pressed("ui_left"):
-
-				move_x -= (
-					WALK_SPEED * delta
-				)
-
-			if Input.is_action_pressed("ui_right"):
-
-				move_x += (
-					WALK_SPEED * delta
-				)
-
-			player.position.x += move_x
-
-			var left_limit = (
-				LEFT_BORDER +
-				PLAYER_SIZE / 2
-			)
-
-			var right_limit = (
-				RIGHT_BORDER -
-				PLAYER_SIZE / 2
-			)
-
-			player.position.x = clamp(
-				player.position.x,
-				left_limit,
-				right_limit
+			handle_player_horizontal_movement(
+				delta
 			)
 
 	if dragging:
@@ -3601,6 +3583,43 @@ func handle_penguin_arrow_movement(delta: float):
 	)
 
 
+func handle_player_horizontal_movement(delta: float):
+
+	# This is the shared pre-launch movement for one-character heroes.
+	# The snail also reuses it after returning to the original launch cell.
+	var move_x = 0.0
+
+	if Input.is_action_pressed("ui_left"):
+
+		move_x -= (
+			WALK_SPEED * delta
+		)
+
+	if Input.is_action_pressed("ui_right"):
+
+		move_x += (
+			WALK_SPEED * delta
+		)
+
+	player.position.x += move_x
+
+	var left_limit = (
+		LEFT_BORDER +
+		PLAYER_SIZE / 2
+	)
+
+	var right_limit = (
+		RIGHT_BORDER -
+		PLAYER_SIZE / 2
+	)
+
+	player.position.x = clamp(
+		player.position.x,
+		left_limit,
+		right_limit
+	)
+
+
 func move_penguins_horizontally(move_x: float):
 
 	if penguins.is_empty():
@@ -3866,31 +3885,43 @@ func launch_from_position(
 	return true
 
 
-func handle_snail_trail_input():
+func handle_snail_trail_input() -> bool:
+
+	var moved = false
 
 	if Input.is_action_just_pressed("ui_left"):
 
-		move_snail_on_trail(
+		if move_snail_on_trail(
 			Vector2i(-1, 0)
-		)
+		):
+
+			moved = true
 
 	if Input.is_action_just_pressed("ui_right"):
 
-		move_snail_on_trail(
+		if move_snail_on_trail(
 			Vector2i(1, 0)
-		)
+		):
+
+			moved = true
 
 	if Input.is_action_just_pressed("ui_up"):
 
-		move_snail_on_trail(
+		if move_snail_on_trail(
 			Vector2i(0, -1)
-		)
+		):
+
+			moved = true
 
 	if Input.is_action_just_pressed("ui_down"):
 
-		move_snail_on_trail(
+		if move_snail_on_trail(
 			Vector2i(0, 1)
-		)
+		):
+
+			moved = true
+
+	return moved
 
 
 func move_snail_on_trail(direction: Vector2i) -> bool:
@@ -3908,13 +3939,117 @@ func move_snail_on_trail(direction: Vector2i) -> bool:
 	var target_cell = current_cell + direction
 
 	if not snail_trail_cells.has(target_cell):
-		return false
+
+		target_cell = get_snail_directional_trail_neighbor(
+			current_cell,
+			direction
+		)
+
+		if target_cell == null:
+			return false
 
 	player.position = position_for_cell(
 		target_cell
 	)
 
 	return true
+
+
+func get_snail_directional_trail_neighbor(
+	current_cell: Vector2i,
+	direction: Vector2i
+):
+
+	# Diagonal trail cells are not directly above, below, left, or right.
+	# We therefore look at the actual previous/next cells in the trail and
+	# accept the neighbor whose diagonal step still points toward the pressed key.
+	var current_index = snail_trail_cells.find(
+		current_cell
+	)
+
+	if current_index == -1:
+		return null
+
+	var best_cell = null
+	var best_score = 0
+
+	for neighbor_index in [
+		current_index - 1,
+		current_index + 1
+	]:
+
+		if (
+			neighbor_index < 0
+			or
+			neighbor_index >= snail_trail_cells.size()
+		):
+
+			continue
+
+		var neighbor_cell = snail_trail_cells[
+			neighbor_index
+		]
+
+		var step = (
+			neighbor_cell -
+			current_cell
+		)
+
+		var score = get_snail_trail_step_score(
+			step,
+			direction
+		)
+
+		if score > best_score:
+
+			best_score = score
+			best_cell = neighbor_cell
+
+	return best_cell
+
+
+func get_snail_trail_step_score(
+	step: Vector2i,
+	direction: Vector2i
+) -> int:
+
+	if direction.x != 0:
+
+		return (
+			direction.x *
+			get_axis_direction(step.x)
+		)
+
+	if direction.y != 0:
+
+		return (
+			direction.y *
+			get_axis_direction(step.y)
+		)
+
+	return 0
+
+
+func get_axis_direction(value: int) -> int:
+
+	if value > 0:
+		return 1
+
+	if value < 0:
+		return -1
+
+	return 0
+
+
+func is_snail_at_launch_cell() -> bool:
+
+	if current_character != PLAYER_10:
+		return false
+
+	return (
+		cell_for_position(player.position) ==
+		cell_for_position(snail_launch_start_position)
+	)
 
 
 func record_snail_trail_from_first_launch():

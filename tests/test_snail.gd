@@ -74,6 +74,66 @@ func _initialize():
 		"The down arrow should move the snail backward along the vertical trail."
 	)
 
+	var diagonal_start_cell = main.cell_for_position(
+		trail_start
+	)
+
+	var diagonal_end_cell = (
+		diagonal_start_cell +
+		Vector2i(1, -1)
+	)
+
+	main.snail_trail_cells.clear()
+	main.add_snail_trail_cell(
+		diagonal_start_cell
+	)
+	main.add_snail_trail_cell(
+		diagonal_end_cell
+	)
+	main.player.position = main.position_for_cell(
+		diagonal_start_cell
+	)
+
+	main.move_snail_on_trail(
+		Vector2i(1, 0)
+	)
+
+	_assert_snail_rule(
+		main.cell_for_position(main.player.position) == diagonal_end_cell,
+		"The right arrow should move the snail along a diagonal trail segment that goes right."
+	)
+
+	main.move_snail_on_trail(
+		Vector2i(-1, 0)
+	)
+
+	_assert_snail_rule(
+		main.cell_for_position(main.player.position) == diagonal_start_cell,
+		"The left arrow should move the snail back along the same diagonal trail segment."
+	)
+
+	main.snail_trail_cells.clear()
+	main.add_snail_trail_cell(
+		diagonal_start_cell
+	)
+	main.add_snail_trail_cell(
+		diagonal_start_cell + Vector2i(0, -1)
+	)
+	main.player.position = main.position_for_cell(
+		diagonal_start_cell
+	)
+
+	var snail_start_x = main.player.position.x
+
+	Input.action_press("ui_right")
+	main._process(0.1)
+	Input.action_release("ui_right")
+
+	_assert_snail_rule(
+		main.player.position.x > snail_start_x,
+		"The snail should use normal arrow movement again when it returns to the launch cell."
+	)
+
 	main.queue_free()
 	quit(1 if failed else 0)
 
