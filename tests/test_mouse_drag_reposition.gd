@@ -25,12 +25,12 @@ func _initialize():
 	main.dragging = true
 	main.drag_start = start_position
 	main.drag_launch_position = start_position
-	main.mouse_pos = start_position + Vector2(120, 80)
+	main.mouse_pos = start_position + Vector2(120, 220)
 	main.update_dragged_player_position()
 
 	_assert_drag_rule(
-		main.player.position.x > start_position.x,
-		"Horizontal mouse dragging should move a regular character left or right."
+		main.player.position.x == main.mouse_pos.x,
+		"Horizontal mouse dragging should keep following the cursor even when it is far above or below the character."
 	)
 
 	_assert_drag_rule(

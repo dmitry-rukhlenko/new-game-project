@@ -1617,6 +1617,8 @@ func _process(delta):
 
 	if dragging:
 
+		update_dragged_player_position()
+
 		show_trajectory()
 
 	else:
@@ -2288,6 +2290,8 @@ func _input(event):
 				if not dragging:
 					return
 
+				update_dragged_player_position()
+
 				dragging = false
 
 				hide_trajectory()
@@ -2342,12 +2346,6 @@ func update_dragged_player_position():
 	if current_character == PLAYER_8:
 		return
 
-	var dragged_x = (
-		drag_launch_position.x +
-		mouse_pos.x -
-		drag_start.x
-	)
-
 	var left_limit = (
 		LEFT_BORDER +
 		PLAYER_SIZE / 2
@@ -2359,9 +2357,11 @@ func update_dragged_player_position():
 	)
 
 	# Horizontal mouse dragging repositions the character before the shot.
-	# Vertical mouse movement is intentionally left for the slingshot pull.
+	# It follows the cursor's X directly, even when the cursor is far above or
+	# below the character. Vertical mouse movement is intentionally left for the
+	# slingshot pull.
 	player.position.x = clamp(
-		dragged_x,
+		mouse_pos.x,
 		left_limit,
 		right_limit
 	)
