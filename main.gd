@@ -2136,7 +2136,7 @@ func finish_turn():
 
 		create_random_trap()
 
-	if score >= get_level_target_kills():
+	if are_all_monsters_defeated():
 
 		game_over = true
 
@@ -2158,7 +2158,7 @@ func finish_turn():
 			PLAYER_START_X,
 			PLAYER_START_Y
 		)
-		
+
 	if current_character == PLAYER_8:
 
 		place_sparrow()
@@ -2180,7 +2180,35 @@ func finish_turn():
 	acorn_velocities.clear()
 	
 	velocity = Vector2.ZERO
-	
+
+
+func are_all_monsters_defeated() -> bool:
+
+	# Victory depends on the actual monster state, not on remaining moves or a
+	# target score. This also covers special monsters that are not counted in
+	# the regular score.
+	for enemy in enemies:
+		if (
+			enemy != null
+			and
+			is_instance_valid(enemy)
+			and
+			not enemy.is_queued_for_deletion()
+		):
+			return false
+
+	if (
+		enemy2 != null
+		and
+		is_instance_valid(enemy2)
+		and
+		not enemy2.is_queued_for_deletion()
+	):
+		return false
+
+	return not enemy2_alive
+
+
 func _input(event):
 
 	if event is InputEventMouseMotion:
