@@ -2036,11 +2036,17 @@ func _process(delta):
 		!dragging
 		and
 		current_character != PLAYER_8
-		and
-		current_character != PLAYER_9
 	):
 
-		if (
+		if current_character == PLAYER_9:
+
+			if not are_penguins_moving():
+
+				handle_penguin_arrow_movement(
+					delta
+				)
+
+		elif (
 			current_character == PLAYER_10
 			and
 			snail_first_launch_recorded
@@ -3550,6 +3556,88 @@ func process_penguin_motion():
 		):
 
 			penguin_velocities[i] = Vector2.ZERO
+
+
+func handle_penguin_arrow_movement(delta: float):
+
+	var move_x = 0.0
+
+	if Input.is_action_pressed("ui_left"):
+
+		move_x -= (
+			WALK_SPEED * delta
+		)
+
+	if Input.is_action_pressed("ui_right"):
+
+		move_x += (
+			WALK_SPEED * delta
+		)
+
+	if move_x == 0.0:
+		return
+
+	move_penguins_horizontally(
+		move_x
+	)
+
+
+func move_penguins_horizontally(move_x: float):
+
+	if penguins.is_empty():
+		return
+
+	var left_limit = (
+		LEFT_BORDER +
+		PLAYER_SIZE / 2
+	)
+
+	var right_limit = (
+		RIGHT_BORDER -
+		PLAYER_SIZE / 2
+	)
+
+	var leftmost_x = INF
+	var rightmost_x = -INF
+
+	for i in range(penguins.size()):
+
+		if not penguin_alive[i]:
+			continue
+
+		if penguins[i] == null:
+			continue
+
+		leftmost_x = min(
+			leftmost_x,
+			penguins[i].position.x
+		)
+
+		rightmost_x = max(
+			rightmost_x,
+			penguins[i].position.x
+		)
+
+	if leftmost_x == INF:
+		return
+
+	# The pair moves as one formation. Clamping the shared delta instead of each
+	# penguin separately preserves the three-tile gap at the field edges.
+	var clamped_move_x = clamp(
+		move_x,
+		left_limit - leftmost_x,
+		right_limit - rightmost_x
+	)
+
+	for i in range(penguins.size()):
+
+		if not penguin_alive[i]:
+			continue
+
+		if penguins[i] == null:
+			continue
+
+		penguins[i].position.x += clamped_move_x
 
 
 func bounce_actor_from_borders(

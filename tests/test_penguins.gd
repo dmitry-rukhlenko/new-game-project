@@ -44,6 +44,28 @@ func _initialize():
 		"The two penguins should start three floor tiles apart."
 	)
 
+	var first_penguin_start_x = main.penguins[0].position.x
+	var second_penguin_start_x = main.penguins[1].position.x
+
+	Input.action_press("ui_right")
+	main._process(0.1)
+	Input.action_release("ui_right")
+
+	_assert_penguin_rule(
+		main.penguins[0].position.x > first_penguin_start_x,
+		"The right arrow should move the first penguin before launch."
+	)
+
+	_assert_penguin_rule(
+		main.penguins[1].position.x > second_penguin_start_x,
+		"The right arrow should move the second penguin before launch."
+	)
+
+	_assert_penguin_rule(
+		abs(main.penguins[0].position.x - main.penguins[1].position.x) == main.CELL * 3,
+		"Arrow movement should keep the penguins three floor tiles apart."
+	)
+
 	main.mouse_pos = main.penguins[0].position + Vector2(-120.0, -40.0)
 	main.launch_from_position(main.penguins[0].position)
 
