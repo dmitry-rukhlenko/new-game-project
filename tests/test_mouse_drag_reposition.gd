@@ -38,6 +38,21 @@ func _initialize():
 		"Mouse dragging should not move the character vertically; vertical movement is slingshot pull."
 	)
 
+	main.player.position = start_position
+	main.drag_start = start_position + Vector2(8, 0)
+	main.drag_launch_position = start_position
+	main.drag_pointer_offset_x = (
+		main.drag_start.x -
+		start_position.x
+	)
+	main.mouse_pos = main.drag_start + Vector2(120, 2)
+	main.update_dragged_player_position()
+
+	_assert_drag_rule(
+		main.player.position.x == main.mouse_pos.x - main.drag_pointer_offset_x,
+		"Horizontal dragging should keep the grabbed point under the cursor instead of snapping the character center to the cursor."
+	)
+
 	var repositioned_x = main.player.position.x
 
 	main.mouse_pos = start_position + Vector2(180, 4)

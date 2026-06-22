@@ -131,6 +131,8 @@ var drag_start := Vector2.ZERO
 
 var drag_launch_position := Vector2.ZERO
 
+var drag_pointer_offset_x := 0.0
+
 var turn_active = false
 
 var score := 0
@@ -2268,6 +2270,11 @@ func _input(event):
 
 					drag_launch_position = player.position
 
+					drag_pointer_offset_x = (
+						pos.x -
+						player.position.x
+					)
+
 			else:
 
 				if not dragging:
@@ -2329,7 +2336,7 @@ func update_dragged_player_position():
 	# character's launch height. Pulling farther up or down switches control to
 	# the slingshot without moving the character at the last moment.
 	player.position.x = clamp(
-		mouse_pos.x,
+		mouse_pos.x - drag_pointer_offset_x,
 		left_limit,
 		right_limit
 	)
