@@ -196,6 +196,8 @@ var snail_trail_cells = []
 
 var snail_trail_tiles = []
 
+var snail_trail_segments = []
+
 var snail_first_launch_recorded = false
 
 var snail_launch_start_position = Vector2(
@@ -1247,6 +1249,12 @@ func start_new_game():
 
 			trail_tile.queue_free()
 
+	for trail_segment in snail_trail_segments:
+
+		if is_instance_valid(trail_segment):
+
+			trail_segment.queue_free()
+
 	enemies.clear()
 
 	walls.clear()
@@ -1274,6 +1282,8 @@ func start_new_game():
 	snail_trail_cells.clear()
 
 	snail_trail_tiles.clear()
+
+	snail_trail_segments.clear()
 
 	snail_first_launch_recorded = false
 
@@ -2102,6 +2112,8 @@ func _process(delta):
 
 		elif velocity.length() > 0:
 
+			var previous_player_position = player.position
+
 			preview_gorilla_push_animation(
 				delta
 			)
@@ -2113,6 +2125,13 @@ func _process(delta):
 			check_border_bounce()
 
 			check_wall_bounce()
+
+			if current_character == PLAYER_10:
+
+				record_snail_live_trail_segment(
+					previous_player_position,
+					player.position
+				)
 
 			if (
 				abs(velocity.x) < MIN_SPEED
@@ -3947,38 +3966,112 @@ func record_snail_trail_from_first_launch():
 	snail_first_launch_recorded = true
 
 
+func record_snail_live_trail_segment(
+	from_position: Vector2,
+	to_position: Vector2
+):
+
+	if current_character != PLAYER_10:
+		return
+
+	if from_position.distance_to(to_position) < 1.0:
+		return
+
+	add_snail_trail_line(
+		from_position,
+		to_position
+	)
+
+	add_snail_trail_cells_between(
+		from_position,
+		to_position
+	)
+
+
+func add_snail_trail_cells_between(
+	from_position: Vector2,
+	to_position: Vector2
+):
+
+	var start_cell = cell_for_position(
+		from_position
+	)
+
+	var end_cell = cell_for_position(
+		to_position
+	)
+
+	var dx = end_cell.x - start_cell.x
+
+	var dy = end_cell.y - start_cell.y
+
+	var steps = maxi(
+		abs(dx),
+		abs(dy)
+	)
+
+	if steps == 0:
+
+		add_snail_trail_cell(
+			start_cell
+		)
+
+		return
+
+	for step in range(steps + 1):
+
+		var t = float(step) / float(steps)
+
+		var trail_cell = Vector2i(
+			int(round(lerp(start_cell.x, end_cell.x, t))),
+			int(round(lerp(start_cell.y, end_cell.y, t)))
+		)
+
+		add_snail_trail_cell(
+			trail_cell
+		)
+
+
+func add_snail_trail_line(
+	from_position: Vector2,
+	to_position: Vector2
+):
+
+	var trail_segment = Line2D.new()
+
+	trail_segment.width = 9.0
+
+	trail_segment.default_color = Color(
+		0.78,
+		0.58,
+		0.26,
+		0.46
+	)
+
+	trail_segment.begin_cap_mode = Line2D.LINE_CAP_ROUND
+
+	trail_segment.end_cap_mode = Line2D.LINE_CAP_ROUND
+
+	trail_segment.joint_mode = Line2D.LINE_JOINT_ROUND
+
+	trail_segment.points = PackedVector2Array([
+		from_position,
+		to_position
+	])
+
+	trail_segment.z_index = 25
+
+	add_child(trail_segment)
+
+	snail_trail_segments.append(trail_segment)
+
+
 func add_snail_trail_cell(cell: Vector2i):
 
 	if snail_trail_cells.has(cell):
 		return
 
 	snail_trail_cells.append(cell)
-
-	var trail_tile = ColorRect.new()
-
-	trail_tile.size = Vector2(
-		CELL * 0.72,
-		CELL * 0.72
-	)
-
-	# Muted ochre keeps the snail trail visible without fighting the board art.
-	trail_tile.color = Color(
-		0.78,
-		0.58,
-		0.26,
-		0.42
-	)
-
-	trail_tile.position = (
-		position_for_cell(cell) -
-		trail_tile.size / 2
-	)
-
-	trail_tile.z_index = 25
-
-	add_child(trail_tile)
-
-	snail_trail_tiles.append(trail_tile)
 		
 func setup_character():
 
