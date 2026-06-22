@@ -1,0 +1,15 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Local OS files
+.DS_Store
+
+# Godot editor temporary scene saves
+*.tmp
+
+# Generated web exports
+/build/
+
+# Cloudflare Wrangler local state
+.wrangler/
