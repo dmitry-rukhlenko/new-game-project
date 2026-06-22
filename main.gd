@@ -48,8 +48,6 @@ const MIN_SPEED = 0.08
 
 const MAX_PULL = 180.0
 
-const DRAG_VERTICAL_DEAD_ZONE = 3.0
-
 const GORILLA_PUSH_POWER = 1.0
 
 const GORILLA_PUSH_PRE_COLLISION_SECONDS = 0.3
@@ -128,10 +126,6 @@ var dragging := false
 var mouse_pos := Vector2.ZERO
 
 var drag_start := Vector2.ZERO
-
-var drag_launch_position := Vector2.ZERO
-
-var drag_pointer_offset_x := 0.0
 
 var turn_active = false
 
@@ -1404,24 +1398,43 @@ func show_trajectory():
 	if player == null:
 		return
 		
-	var pull = get_slingshot_pull()
+	var pos = (
+		get_global_mouse_position()
+	)
+	
+	var dx = (
+		player.position.x -
+		pos.x
+	)
 
-	var dist = pull.length()
+	var dy = (
+		player.position.y -
+		pos.y
+	)
+
+	var dist = sqrt(
+		dx * dx +
+		dy * dy
+	)
 
 	if dist < 5:
 		return
 
 	if dist > MAX_PULL:
 
-		pull *= (
+		dx *= (
+			MAX_PULL / dist
+		)
+
+		dy *= (
 			MAX_PULL / dist
 		)
 
 	var tx = player.position.x
-	var ty = drag_launch_position.y
+	var ty = player.position.y
 
-	var tvx = pull.x * SHOT_POWER
-	var tvy = pull.y * SHOT_POWER
+	var tvx = dx * SHOT_POWER
+	var tvy = dy * SHOT_POWER
 
 	var bounce_count = 0
 	var points_after_bounce = 0
@@ -1601,8 +1614,6 @@ func _process(delta):
 		)
 
 	if dragging:
-
-		update_dragged_player_position()
 
 		show_trajectory()
 
@@ -2178,9 +2189,6 @@ func _input(event):
 			get_global_mouse_position()
 		)
 
-		if dragging:
-			update_dragged_player_position()
-
 	if event is InputEventMouseButton:
 
 		if (
@@ -2268,40 +2276,48 @@ func _input(event):
 
 					drag_start = pos
 
-					drag_launch_position = player.position
-
-					drag_pointer_offset_x = (
-						pos.x -
-						player.position.x
-					)
-
 			else:
 
 				if not dragging:
 					return
 
-				update_dragged_player_position()
-
 				dragging = false
 
 				hide_trajectory()
 
-				var pull = get_slingshot_pull()
+				var release_launch_pos = player.position
 
-				var dist = pull.length()
+				var dx = (
+					release_launch_pos.x -
+					mouse_pos.x
+				)
+
+				var dy = (
+					release_launch_pos.y -
+					mouse_pos.y
+				)
+
+				var dist = sqrt(
+					dx * dx +
+					dy * dy
+				)
 
 				if dist < 5:
 					return
 
 				if dist > MAX_PULL:
 
-					pull *= (
+					dx *= (
+						MAX_PULL / dist
+					)
+
+					dy *= (
 						MAX_PULL / dist
 					)
 
 				velocity = Vector2(
-					pull.x * SHOT_POWER,
-					pull.y * SHOT_POWER
+					dx * SHOT_POWER,
+					dy * SHOT_POWER
 				)
 
 				turn_active = true
@@ -2309,57 +2325,6 @@ func _input(event):
 				moves -= 1
 
 				update_move_icons()
-
-
-func update_dragged_player_position():
-
-	if player == null:
-		return
-
-	if current_character == PLAYER_8:
-		return
-
-	if not is_mouse_in_horizontal_drag_zone():
-		return
-
-	var left_limit = (
-		LEFT_BORDER +
-		PLAYER_SIZE / 2
-	)
-
-	var right_limit = (
-		RIGHT_BORDER -
-		PLAYER_SIZE / 2
-	)
-
-	# Horizontal dragging is only active while the cursor stays close to the
-	# character's launch height. Pulling farther up or down switches control to
-	# the slingshot without moving the character at the last moment.
-	player.position.x = clamp(
-		mouse_pos.x - drag_pointer_offset_x,
-		left_limit,
-		right_limit
-	)
-
-
-func get_slingshot_pull() -> Vector2:
-
-	# The slingshot pull is the vector from the mouse back toward the character.
-	# Keeping this in one helper makes the preview dots and the real launch use
-	# the same direction while the cursor moves outside the horizontal drag zone.
-	return Vector2(
-		player.position.x - mouse_pos.x,
-		drag_launch_position.y - mouse_pos.y
-	)
-
-
-func is_mouse_in_horizontal_drag_zone() -> bool:
-
-	return (
-		abs(mouse_pos.y - drag_launch_position.y)
-		<=
-		DRAG_VERTICAL_DEAD_ZONE
-	)
 
 
 func create_floor():
