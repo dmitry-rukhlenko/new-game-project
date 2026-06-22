@@ -1402,43 +1402,24 @@ func show_trajectory():
 	if player == null:
 		return
 		
-	var pos = (
-		get_global_mouse_position()
-	)
-	
-	var dx = (
-		player.position.x -
-		pos.x
-	)
+	var pull = get_slingshot_pull()
 
-	var dy = (
-		drag_launch_position.y -
-		pos.y
-	)
-
-	var dist = sqrt(
-		dx * dx +
-		dy * dy
-	)
+	var dist = pull.length()
 
 	if dist < 5:
 		return
 
 	if dist > MAX_PULL:
 
-		dx *= (
-			MAX_PULL / dist
-		)
-
-		dy *= (
+		pull *= (
 			MAX_PULL / dist
 		)
 
 	var tx = player.position.x
 	var ty = drag_launch_position.y
 
-	var tvx = dx * SHOT_POWER
-	var tvy = dy * SHOT_POWER
+	var tvx = pull.x * SHOT_POWER
+	var tvy = pull.y * SHOT_POWER
 
 	var bounce_count = 0
 	var points_after_bounce = 0
@@ -2298,39 +2279,22 @@ func _input(event):
 
 				hide_trajectory()
 
-				var launch_origin = drag_launch_position
+				var pull = get_slingshot_pull()
 
-				var dx = (
-					player.position.x -
-					mouse_pos.x
-				)
-
-				var dy = (
-					launch_origin.y -
-					mouse_pos.y
-				)
-
-				var dist = sqrt(
-					dx * dx +
-					dy * dy
-				)
+				var dist = pull.length()
 
 				if dist < 5:
 					return
 
 				if dist > MAX_PULL:
 
-					dx *= (
-						MAX_PULL / dist
-					)
-
-					dy *= (
+					pull *= (
 						MAX_PULL / dist
 					)
 
 				velocity = Vector2(
-					dx * SHOT_POWER,
-					dy * SHOT_POWER
+					pull.x * SHOT_POWER,
+					pull.y * SHOT_POWER
 				)
 
 				turn_active = true
@@ -2368,6 +2332,17 @@ func update_dragged_player_position():
 		mouse_pos.x,
 		left_limit,
 		right_limit
+	)
+
+
+func get_slingshot_pull() -> Vector2:
+
+	# The slingshot pull is the vector from the mouse back toward the character.
+	# Keeping this in one helper makes the preview dots and the real launch use
+	# the same direction while the cursor moves outside the horizontal drag zone.
+	return Vector2(
+		player.position.x - mouse_pos.x,
+		drag_launch_position.y - mouse_pos.y
 	)
 
 

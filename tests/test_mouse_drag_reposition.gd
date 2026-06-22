@@ -48,6 +48,17 @@ func _initialize():
 		"Horizontal mouse dragging should stop moving the character when the cursor leaves the vertical drag zone."
 	)
 
+	var pull_right = main.get_slingshot_pull()
+
+	main.mouse_pos = start_position + Vector2(80, 4)
+
+	var pull_left = main.get_slingshot_pull()
+
+	_assert_drag_rule(
+		pull_right.x < 0 and pull_left.x > 0,
+		"Slingshot direction should change when the mouse moves horizontally outside the drag zone."
+	)
+
 	main.current_character = main.PLAYER_8
 	main.setup_character()
 	main.start_new_game()
