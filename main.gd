@@ -33,12 +33,17 @@ const PLAYER_3 = 3
 const PLAYER_5 = 5
 const PLAYER_7 = 7
 const PLAYER_8 = 8
+const PLAYER_9 = 9
+const PLAYER_10 = 10
 
 
 const LEVEL_0 = 0
 const LEVEL_1 = 1
 const LEVEL_2 = 2
 const LEVEL_3 = 3
+const LEVEL_1S = 11
+const LEVEL_2S = 12
+const LEVEL_3S = 13
 # Физика как в CodePen
 
 const SHOT_POWER = 0.18
@@ -141,6 +146,8 @@ var velocity := Vector2.ZERO
 
 var trajectory_dots = []
 
+var penguin_trajectory_dots = []
+
 var move_icons = []
 
 var enemies = []
@@ -149,7 +156,11 @@ var stars = []
 
 var traps = []
 
+var crystals = []
+
 var enemy2 = null
+
+var gift = null
 
 var current_character = PLAYER_1
 
@@ -170,6 +181,27 @@ var character_buttons = []
 var walls = [] 
 
 var wall_velocities = []
+
+var floor_tiles = []
+
+var penguins = []
+
+var penguin_velocities = []
+
+var penguin_alive = []
+
+var active_penguin_index = 0
+
+var snail_trail_cells = []
+
+var snail_trail_tiles = []
+
+var snail_first_launch_recorded = false
+
+var snail_launch_start_position = Vector2(
+	PLAYER_START_X,
+	PLAYER_START_Y
+)
 
 var acorns = [] 
 
@@ -212,7 +244,7 @@ func create_background():
 	background_sprite = Sprite2D.new()
 
 	background_sprite.texture = load(
-		"res://art/background.png"
+		get_background_texture_path()
 	)
 
 	background_sprite.centered = false
@@ -220,6 +252,24 @@ func create_background():
 	background_sprite.position = Vector2.ZERO
 
 	add_child(background_sprite)
+
+
+func get_background_texture_path() -> String:
+
+	if is_winter_level():
+		return "res://art/background2.png"
+
+	return "res://art/background.png"
+
+
+func update_background():
+
+	if background_sprite == null:
+		return
+
+	background_sprite.texture = load(
+		get_background_texture_path()
+	)
 
 
 func create_player():
@@ -351,12 +401,37 @@ func create_trajectory_dots():
 
 		trajectory_dots.append(dot)
 
+		var penguin_dot = ColorRect.new()
+
+		penguin_dot.size = Vector2(
+			6,
+			6
+		)
+
+		penguin_dot.color = Color8(
+			128,
+			218,
+			238
+		)
+
+		penguin_dot.visible = false
+
+		penguin_dot.z_index = 400
+
+		add_child(penguin_dot)
+
+		penguin_trajectory_dots.append(penguin_dot)
+
 
 func hide_trajectory():
 
 	for dot in trajectory_dots:
 
 		dot.visible = false 
+
+	for dot in penguin_trajectory_dots:
+
+		dot.visible = false
 
 
 func create_victory_popup():
@@ -895,7 +970,52 @@ func is_result_button_click(
 	)
 
 
+func get_character_ids() -> Array:
+
+	return [
+		PLAYER_1,
+		PLAYER_2,
+		PLAYER_3,
+		PLAYER_5,
+		PLAYER_7,
+		PLAYER_8,
+		PLAYER_9,
+		PLAYER_10
+	]
+
+
+func get_level_ids() -> Array:
+
+	return [
+		LEVEL_0,
+		LEVEL_1,
+		LEVEL_2,
+		LEVEL_3,
+		LEVEL_1S,
+		LEVEL_2S,
+		LEVEL_3S
+	]
+
+
+func is_winter_level() -> bool:
+
+	return (
+		current_level == LEVEL_1S
+		or
+		current_level == LEVEL_2S
+		or
+		current_level == LEVEL_3S
+	)
+
+
+func is_level_3s() -> bool:
+
+	return current_level == LEVEL_3S
+
+
 func handle_character_button_click(click_position: Vector2) -> bool:
+
+	var character_ids = get_character_ids()
 
 	for i in range(
 		character_buttons.size()
@@ -912,15 +1032,6 @@ func handle_character_button_click(click_position: Vector2) -> bool:
 			button.position
 		) >= 40:
 			continue
-
-		var character_ids = [
-			PLAYER_1,
-			PLAYER_2,
-			PLAYER_3,
-			PLAYER_5,
-			PLAYER_7,
-			PLAYER_8
-		]
 
 		current_character = (
 			character_ids[i]
@@ -940,6 +1051,8 @@ func handle_character_button_click(click_position: Vector2) -> bool:
 
 func handle_level_button_click(click_position: Vector2) -> bool:
 
+	var level_ids = get_level_ids()
+
 	for i in range(
 		level_buttons.size()
 	):
@@ -955,13 +1068,6 @@ func handle_level_button_click(click_position: Vector2) -> bool:
 			button.position
 		) >= 40:
 			continue
-
-		var level_ids = [
-			LEVEL_0,
-			LEVEL_1,
-			LEVEL_2,
-			LEVEL_3
-		]
 
 		current_level = level_ids[i]
 
@@ -985,10 +1091,22 @@ func get_level_target_kills() -> int:
 
 func get_next_level() -> int:
 
-	if current_level < LEVEL_3:
-		return current_level + 1
+	var level_ids = get_level_ids()
 
-	return LEVEL_3
+	var current_index = level_ids.find(
+		current_level
+	)
+
+	if (
+		current_index >= 0
+		and
+		current_index < level_ids.size() - 1
+	):
+		return level_ids[
+			current_index + 1
+		]
+
+	return LEVEL_3S
 
 
 func get_level_start_moves() -> int:
@@ -1016,19 +1134,14 @@ func update_level_button_states():
 
 	active_level_outlines.clear()
 
+	var level_ids = get_level_ids()
+
 	for i in range(level_buttons.size()):
 
 		var button = level_buttons[i]
 
 		if button == null:
 			continue
-
-		var level_ids = [
-			LEVEL_0,
-			LEVEL_1,
-			LEVEL_2,
-			LEVEL_3
-		]
 
 		if level_ids[i] != current_level:
 			continue
@@ -1063,6 +1176,8 @@ func start_new_game():
 	hide_victory_popup()
 
 	hide_defeat_popup()
+
+	update_background()
 
 	map_generation_id += 1
 
@@ -1104,13 +1219,68 @@ func start_new_game():
 
 			trap.queue_free()
 
+	for crystal in crystals:
+
+		if is_instance_valid(crystal):
+
+			crystal.queue_free()
+
+	if gift != null and is_instance_valid(gift):
+
+		gift.queue_free()
+
+	for tile in floor_tiles:
+
+		if is_instance_valid(tile):
+
+			tile.queue_free()
+
+	for penguin in penguins:
+
+		if is_instance_valid(penguin):
+
+			penguin.queue_free()
+
+	for trail_tile in snail_trail_tiles:
+
+		if is_instance_valid(trail_tile):
+
+			trail_tile.queue_free()
+
 	enemies.clear()
 
 	walls.clear()
 
+	wall_velocities.clear()
+
 	stars.clear()
 
 	traps.clear()
+
+	crystals.clear()
+
+	gift = null
+
+	floor_tiles.clear()
+
+	penguins.clear()
+
+	penguin_velocities.clear()
+
+	penguin_alive.clear()
+
+	active_penguin_index = 0
+
+	snail_trail_cells.clear()
+
+	snail_trail_tiles.clear()
+
+	snail_first_launch_recorded = false
+
+	snail_launch_start_position = Vector2(
+		PLAYER_START_X,
+		PLAYER_START_Y
+	)
 
 	for acorn in acorns:
 
@@ -1155,10 +1325,18 @@ func start_new_game():
 		PLAYER_START_X,
 		PLAYER_START_Y
 	)
+
+	player.visible = (
+		current_character != PLAYER_9
+	)
 	
 	if current_character == PLAYER_8:
 
 		place_sparrow()
+
+	if current_character == PLAYER_9:
+
+		create_penguins()
 		
 		
 	create_floor()
@@ -1190,11 +1368,11 @@ func generate_level():
 		# test level while tuning controls, collisions, and character behavior.
 		enemy_count = 1
 
-		wall_count = 0
+		wall_count = 1
 
-		trap_count = 0
+		trap_count = 1
 
-		star_count = 0
+		star_count = 1
 
 	if current_level == LEVEL_1:
 
@@ -1218,7 +1396,37 @@ func generate_level():
 
 		trap_growth_enabled = true
 
+	if current_level == LEVEL_1S:
+
+		enemy_count = 6
+
+		wall_count = 2
+
+	if current_level == LEVEL_2S:
+
+		enemy_count = 8
+
+		wall_count = 4
+
+	if current_level == LEVEL_3S:
+
+		enemy_count = 7
+
+		wall_count = 0
+
+		star_count = 0
+
 	var used_cells = {}
+
+	if current_level == LEVEL_3S:
+
+		create_enemy4_with_crystals(
+			used_cells
+		)
+
+		create_gift(
+			used_cells
+		)
 
 	while enemies.size() < enemy_count:
 
@@ -1265,24 +1473,198 @@ func generate_level():
 
 		used_cells[key] = true
 
-	while walls.size() < wall_count:
+	if is_winter_level() and current_level != LEVEL_3S:
 
-		var x = randi() % COLS
+		var wall_rectangles_created = 0
 
-		var y = randi() % ROWS
+		while wall_rectangles_created < wall_count:
 
-		var key = "%d_%d" % [x, y]
+			if create_wall2_rectangle(
+				used_cells
+			):
 
-		if used_cells.has(key):
-			continue
+				wall_rectangles_created += 1
 
-		create_wall(x, y)
+			else:
 
-		used_cells[key] = true
+				break
+
+	else:
+
+		while walls.size() < wall_count:
+
+			var x = randi() % COLS
+
+			var y = randi() % ROWS
+
+			var key = "%d_%d" % [x, y]
+
+			if used_cells.has(key):
+				continue
+
+			create_wall(x, y)
+
+			used_cells[key] = true
 
 	if current_level == LEVEL_3:
 
 		create_enemy2() 
+
+
+func cell_key(
+	x: int,
+	y: int
+) -> String:
+
+	return "%d_%d" % [
+		x,
+		y
+	]
+
+
+func cell_for_position(position: Vector2) -> Vector2i:
+
+	return Vector2i(
+		int(
+			(position.x - LEFT_BORDER) /
+			CELL
+		),
+		int(
+			(position.y - TOP_BORDER) /
+			CELL
+		)
+	)
+
+
+func position_for_cell(cell: Vector2i) -> Vector2:
+
+	return Vector2(
+		LEFT_BORDER +
+		cell.x * CELL +
+		CELL / 2,
+		TOP_BORDER +
+		cell.y * CELL +
+		CELL / 2
+	)
+
+
+func mark_used_cell(
+	used_cells: Dictionary,
+	cell: Vector2i
+):
+
+	used_cells[
+		cell_key(
+			cell.x,
+			cell.y
+		)
+	] = true
+
+
+func is_cell_used(
+	used_cells: Dictionary,
+	cell: Vector2i
+) -> bool:
+
+	return used_cells.has(
+		cell_key(
+			cell.x,
+			cell.y
+		)
+	)
+
+
+func create_wall2_rectangle(
+	used_cells: Dictionary
+) -> bool:
+
+	for _attempt in range(300):
+
+		var horizontal = (
+			randi() % 2 == 0
+		)
+
+		var x = randi() % (
+			COLS - 1 if horizontal else COLS
+		)
+
+		var y = randi() % (
+			ROWS if horizontal else ROWS - 1
+		)
+
+		var first_cell = Vector2i(
+			x,
+			y
+		)
+
+		var second_cell = first_cell + (
+			Vector2i(1, 0) if horizontal else Vector2i(0, 1)
+		)
+
+		var cells = [
+			first_cell,
+			second_cell
+		]
+
+		if not can_place_wall2_rectangle(
+			cells,
+			used_cells
+		):
+			continue
+
+		for cell in cells:
+
+			create_wall(
+				cell.x,
+				cell.y,
+				"res://art/wall2.png"
+			)
+
+			mark_used_cell(
+				used_cells,
+				cell
+			)
+
+		return true
+
+	return false
+
+
+func can_place_wall2_rectangle(
+	cells: Array,
+	used_cells: Dictionary
+) -> bool:
+
+	for cell in cells:
+
+		if is_cell_used(
+			used_cells,
+			cell
+		):
+			return false
+
+		for wall in walls:
+
+			if wall == null:
+				continue
+
+			var wall_cell = cell_for_position(
+				wall.position
+			)
+
+			var distance = (
+				abs(cell.x - wall_cell.x) +
+				abs(cell.y - wall_cell.y)
+			)
+
+			# A new wall2 rectangle may touch its own second tile, but it must
+			# not touch any already placed wall2 rectangle. That keeps the map
+			# readable and prevents accidental four-tile blocks.
+			if distance == 1:
+				return false
+
+	return true
+
 
 func create_enemy(
 	x: int,
@@ -1292,7 +1674,7 @@ func create_enemy(
 	var enemy = Sprite2D.new()
 
 	enemy.texture = load(
-		"res://art/enemy.png"
+		"res://art/enemy3.png" if is_winter_level() else "res://art/enemy.png"
 	)
 
 	enemy.position = Vector2(
@@ -1313,13 +1695,14 @@ func create_enemy(
 
 func create_wall(
 	x: int,
-	y: int
+	y: int,
+	texture_path := "res://art/wall.png"
 ):
 
 	var wall = Sprite2D.new()
 
 	wall.texture = load(
-		"res://art/wall.png"
+		texture_path
 	)
 
 	wall.position = Vector2(
@@ -1376,7 +1759,7 @@ func create_trap(
 	var trap = Sprite2D.new()
 
 	trap.texture = load(
-		"res://art/trap.png"
+		"res://art/trap2.png" if is_winter_level() else "res://art/trap.png"
 	)
 
 	trap.position = Vector2(
@@ -1401,15 +1784,66 @@ func show_trajectory():
 	var pos = (
 		get_global_mouse_position()
 	)
-	
+
+	if current_character == PLAYER_9:
+
+		var active_penguin = get_active_penguin()
+
+		if active_penguin == null:
+			return
+
+		var launch_velocity = get_launch_velocity(
+			active_penguin.position,
+			pos
+		)
+
+		if launch_velocity == Vector2.ZERO:
+			return
+
+		draw_trajectory_from(
+			penguins[0].position,
+			launch_velocity,
+			trajectory_dots
+		)
+
+		if penguins.size() > 1:
+
+			draw_trajectory_from(
+				penguins[1].position,
+				launch_velocity,
+				penguin_trajectory_dots
+			)
+
+		return
+
+	var launch_velocity = get_launch_velocity(
+		player.position,
+		pos
+	)
+
+	if launch_velocity == Vector2.ZERO:
+		return
+
+	draw_trajectory_from(
+		player.position,
+		launch_velocity,
+		trajectory_dots
+	)
+
+
+func get_launch_velocity(
+	launch_position: Vector2,
+	target_position: Vector2
+) -> Vector2:
+
 	var dx = (
-		player.position.x -
-		pos.x
+		launch_position.x -
+		target_position.x
 	)
 
 	var dy = (
-		player.position.y -
-		pos.y
+		launch_position.y -
+		target_position.y
 	)
 
 	var dist = sqrt(
@@ -1418,7 +1852,7 @@ func show_trajectory():
 	)
 
 	if dist < 5:
-		return
+		return Vector2.ZERO
 
 	if dist > MAX_PULL:
 
@@ -1430,11 +1864,23 @@ func show_trajectory():
 			MAX_PULL / dist
 		)
 
-	var tx = player.position.x
-	var ty = player.position.y
+	return Vector2(
+		dx * SHOT_POWER,
+		dy * SHOT_POWER
+	)
 
-	var tvx = dx * SHOT_POWER
-	var tvy = dy * SHOT_POWER
+
+func draw_trajectory_from(
+	origin: Vector2,
+	initial_velocity: Vector2,
+	dots: Array
+):
+
+	var tx = origin.x
+	var ty = origin.y
+
+	var tvx = initial_velocity.x
+	var tvy = initial_velocity.y
 
 	var bounce_count = 0
 	var points_after_bounce = 0
@@ -1512,27 +1958,27 @@ func show_trajectory():
 		tvx *= FRICTION
 		tvy *= FRICTION
 
-		for wall in walls:
+		for obstacle in get_solid_obstacles():
 
-			if wall == null:
+			if obstacle == null:
 				continue
 
 			if overlap_cell(
 				Vector2(tx, ty),
-				wall.position
+				obstacle.position
 			):
 
-				var dx_wall = (
+				var dx_obstacle = (
 					tx -
-					wall.position.x
+					obstacle.position.x
 				)
 
-				var dy_wall = (
+				var dy_obstacle = (
 					ty -
-					wall.position.y
+					obstacle.position.y
 				)
 
-				if abs(dx_wall) > abs(dy_wall):
+				if abs(dx_obstacle) > abs(dy_obstacle):
 
 					tvx *= -1.0
 
@@ -1557,16 +2003,27 @@ func show_trajectory():
 					i,
 					TRAJECTORY_POINTS
 				):
-					trajectory_dots[j].visible = false
+					dots[j].visible = false
 
 				break
 
-		trajectory_dots[i].position = Vector2(
+		dots[i].position = Vector2(
 			tx,
 			ty
 		)
 
-		trajectory_dots[i].visible = true 
+		dots[i].visible = true
+
+
+func get_solid_obstacles() -> Array:
+
+	var obstacles = []
+
+	obstacles.append_array(walls)
+
+	obstacles.append_array(crystals)
+
+	return obstacles
 
 func _process(delta):
 
@@ -1579,39 +2036,51 @@ func _process(delta):
 		!dragging
 		and
 		current_character != PLAYER_8
+		and
+		current_character != PLAYER_9
 	):
 
-		var move_x = 0.0
+		if (
+			current_character == PLAYER_10
+			and
+			snail_first_launch_recorded
+		):
 
-		if Input.is_action_pressed("ui_left"):
+			handle_snail_trail_input()
 
-			move_x -= (
-				WALK_SPEED * delta
+		else:
+
+			var move_x = 0.0
+
+			if Input.is_action_pressed("ui_left"):
+
+				move_x -= (
+					WALK_SPEED * delta
+				)
+
+			if Input.is_action_pressed("ui_right"):
+
+				move_x += (
+					WALK_SPEED * delta
+				)
+
+			player.position.x += move_x
+
+			var left_limit = (
+				LEFT_BORDER +
+				PLAYER_SIZE / 2
 			)
 
-		if Input.is_action_pressed("ui_right"):
-
-			move_x += (
-				WALK_SPEED * delta
+			var right_limit = (
+				RIGHT_BORDER -
+				PLAYER_SIZE / 2
 			)
 
-		player.position.x += move_x
-
-		var left_limit = (
-			LEFT_BORDER +
-			PLAYER_SIZE / 2
-		)
-
-		var right_limit = (
-			RIGHT_BORDER -
-			PLAYER_SIZE / 2
-		)
-
-		player.position.x = clamp(
-			player.position.x,
-			left_limit,
-			right_limit
-		)
+			player.position.x = clamp(
+				player.position.x,
+				left_limit,
+				right_limit
+			)
 
 	if dragging:
 
@@ -1621,7 +2090,11 @@ func _process(delta):
 
 		hide_trajectory()
 
-		if velocity.length() > 0:
+		if current_character == PLAYER_9:
+
+			process_penguin_motion()
+
+		elif velocity.length() > 0:
 
 			preview_gorilla_push_animation(
 				delta
@@ -1631,17 +2104,17 @@ func _process(delta):
 
 			velocity *= FRICTION
 
-		check_border_bounce()
+			check_border_bounce()
 
-		check_wall_bounce()
+			check_wall_bounce()
 
-		if (
-			abs(velocity.x) < MIN_SPEED
-			and
-			abs(velocity.y) < MIN_SPEED
-		):
+			if (
+				abs(velocity.x) < MIN_SPEED
+				and
+				abs(velocity.y) < MIN_SPEED
+			):
 
-			velocity = Vector2.ZERO
+				velocity = Vector2.ZERO
 
 	for i in range(
 		acorns.size()
@@ -1810,7 +2283,15 @@ func _process(delta):
 	if not turn_active:
 		return
 
-	if current_character == PLAYER_3:
+	if current_character == PLAYER_9:
+
+		if not are_penguins_moving():
+
+			turn_active = false
+
+			finish_turn()
+
+	elif current_character == PLAYER_3:
 
 		if velocity == Vector2.ZERO:
 
@@ -2019,122 +2500,71 @@ func check_wall_bounce():
 				sign(dy) * 4
 			)
 
-					
+	for crystal in crystals:
+
+		if crystal == null:
+			continue
+
+		if not overlap_cell(
+			player.position,
+			crystal.position
+		):
+			continue
+
+		var dx_crystal = (
+			player.position.x -
+			crystal.position.x
+		)
+
+		var dy_crystal = (
+			player.position.y -
+			crystal.position.y
+		)
+
+		if abs(dx_crystal) > abs(dy_crystal):
+
+			velocity.x *= -0.8
+
+			player.position.x += (
+				sign(dx_crystal) * 4
+			)
+
+		else:
+
+			velocity.y *= -0.8
+
+			player.position.y += (
+				sign(dy_crystal) * 4
+			)
+
+
 func finish_turn():
 
-	for trap in traps:
+	if current_character == PLAYER_9:
 
-		if overlap_cell(
-			player.position,
-			trap.position
-		):
+		finish_penguin_turn()
 
-			game_over = true
+		return
 
-			show_defeat_popup()
+	if current_character == PLAYER_10:
 
-			return
+		record_snail_trail_from_first_launch()
 
-	for enemy in enemies:
+	if is_actor_on_trap(player):
 
-		if enemy == null:
-			continue
+		game_over = true
 
-		if overlap_cell(
-			player.position,
-			enemy.position
-		):
+		show_defeat_popup()
 
-			enemy.queue_free()
+		return
 
-			score += 1
+	process_actor_rewards_and_hits(player)
 
-	if (
-		enemy2 != null
-		and
-		overlap_cell(
-			player.position,
-			enemy2.position
-		)
-	):
-
-		enemy2.queue_free()
-
-		enemy2 = null
-
-		enemy2_alive = false
-
-	for star in stars:
-
-		if star == null:
-			continue
-
-		if overlap_cell(
-			player.position,
-			star.position
-		):
-
-			star.queue_free()
-
-			moves += 2
+	process_acorn_rewards_and_hits()
 
 	update_move_icons()
 
-	for acorn in acorns:
-
-		if acorn == null:
-			continue
-
-		for enemy in enemies:
-
-			if enemy == null:
-				continue
-
-			if overlap_cell(
-				acorn.position,
-				enemy.position
-			):
-
-				enemy.queue_free()
-
-				score += 1
-
-		if (
-			enemy2 != null
-			and
-			overlap_cell(
-				acorn.position,
-				enemy2.position
-			)
-		):
-
-			enemy2.queue_free()
-
-			enemy2 = null
-
-			enemy2_alive = false
-
-		for star in stars:
-
-			if star == null:
-				continue
-
-			if overlap_cell(
-				acorn.position,
-				star.position
-			):
-
-				star.queue_free()
-
-				moves += 2
-
-	update_move_icons()
-
-	if current_level == LEVEL_3 and enemy2_alive:
-
-		create_random_trap()
-
-		create_random_trap()
+	run_end_of_turn_level_effects()
 
 	if are_all_monsters_defeated():
 
@@ -2152,7 +2582,11 @@ func finish_turn():
 
 		return
 
-	if current_character != PLAYER_5:
+	if (
+		current_character != PLAYER_5
+		and
+		current_character != PLAYER_10
+	):
 
 		player.position = Vector2(
 			PLAYER_START_X,
@@ -2162,12 +2596,163 @@ func finish_turn():
 	if current_character == PLAYER_8:
 
 		place_sparrow()
-		
-	velocity = Vector2.ZERO
-	
+
 	velocity = Vector2.ZERO
 
 	acorns_spawned = false
+
+	clear_acorns()
+
+
+func finish_penguin_turn():
+
+	for i in range(penguins.size()):
+
+		if not penguin_alive[i]:
+			continue
+
+		var penguin = penguins[i]
+
+		if penguin == null:
+			continue
+
+		if is_actor_on_trap(penguin):
+
+			penguin_alive[i] = false
+
+			penguin.visible = false
+
+			penguin_velocities[i] = Vector2.ZERO
+
+			continue
+
+		process_actor_rewards_and_hits(penguin)
+
+	update_move_icons()
+
+	run_end_of_turn_level_effects()
+
+	if are_all_monsters_defeated():
+
+		game_over = true
+
+		show_victory_popup()
+
+		return
+
+	if not has_alive_penguin():
+
+		game_over = true
+
+		show_defeat_popup()
+
+		return
+
+	if moves <= 0:
+
+		game_over = true
+
+		show_defeat_popup()
+
+		return
+
+	reset_penguins_for_next_turn()
+
+
+func process_actor_rewards_and_hits(actor: Sprite2D):
+
+	if actor == null:
+		return
+
+	for enemy in enemies:
+
+		if enemy == null:
+			continue
+
+		if overlap_cell(
+			actor.position,
+			enemy.position
+		):
+
+			enemy.queue_free()
+
+			score += 1
+
+	if (
+		enemy2 != null
+		and
+		overlap_cell(
+			actor.position,
+			enemy2.position
+		)
+	):
+
+		enemy2.queue_free()
+
+		enemy2 = null
+
+		enemy2_alive = false
+
+	for star in stars:
+
+		if star == null:
+			continue
+
+		if overlap_cell(
+			actor.position,
+			star.position
+		):
+
+			star.queue_free()
+
+			moves += 2
+
+	collect_gift_if_needed(actor)
+
+
+func process_acorn_rewards_and_hits():
+
+	for acorn in acorns:
+
+		if acorn == null:
+			continue
+
+		process_actor_rewards_and_hits(acorn)
+
+
+func is_actor_on_trap(actor: Sprite2D) -> bool:
+
+	if actor == null:
+		return false
+
+	for trap in traps:
+
+		if trap == null:
+			continue
+
+		if overlap_cell(
+			actor.position,
+			trap.position
+		):
+			return true
+
+	return false
+
+
+func run_end_of_turn_level_effects():
+
+	if current_level == LEVEL_3 and enemy2_alive:
+
+		create_random_trap()
+
+		create_random_trap()
+
+	if current_level == LEVEL_3S and enemy2_alive:
+
+		summon_enemy4_wall2_rectangles()
+
+
+func clear_acorns():
 
 	for acorn in acorns:
 
@@ -2178,8 +2763,6 @@ func finish_turn():
 	acorns.clear()
 
 	acorn_velocities.clear()
-	
-	velocity = Vector2.ZERO
 
 
 func are_all_monsters_defeated() -> bool:
@@ -2232,6 +2815,8 @@ func _input(event):
 				get_global_mouse_position()
 			)
 
+			mouse_pos = pos
+
 			if handle_defeat_retry_click(pos):
 				return
 
@@ -2243,16 +2828,6 @@ func _input(event):
 
 			if game_over:
 				return
-
-			var launch_pos = player.position
-
-			var half_x = (
-				PLAYER_SIZE / 2
-			)
-
-			var half_y = (
-				PLAYER_SIZE / 2
-			)
 
 			if restart_button != null:
 
@@ -2273,98 +2848,74 @@ func _input(event):
 			if velocity.length() > 0:
 				return
 
+			if (
+				current_character == PLAYER_9
+				and
+				are_penguins_moving()
+			):
+				return
+
 			for v in acorn_velocities:
 
 				if v.length() > MIN_SPEED:
 					return
 
-			if (
+			var launch_actor = get_launch_actor_at_position(
+				pos
+			)
 
-				pos.x >=
-				launch_pos.x - half_x
+			if launch_actor != null:
 
-				and
+				dragging = true
 
-				pos.x <=
-				launch_pos.x + half_x
+				drag_start = pos
 
-				and
+			return
 
-				pos.y >=
-				launch_pos.y - half_y
+		else:
 
-				and
+			if not dragging:
+				return
 
-				pos.y <=
-				launch_pos.y + half_y
+			dragging = false
 
-				):
+			hide_trajectory()
 
-					dragging = true
+			mouse_pos = get_global_mouse_position()
 
-					drag_start = pos
+			var release_actor = (
+				get_active_penguin()
+				if current_character == PLAYER_9
+				else player
+			)
 
-			else:
+			if release_actor == null:
+				return
 
-				if not dragging:
-					return
-
-				dragging = false
-
-				hide_trajectory()
-
-				var release_launch_pos = player.position
-
-				var dx = (
-					release_launch_pos.x -
-					mouse_pos.x
-				)
-
-				var dy = (
-					release_launch_pos.y -
-					mouse_pos.y
-				)
-
-				var dist = sqrt(
-					dx * dx +
-					dy * dy
-				)
-
-				if dist < 5:
-					return
-
-				if dist > MAX_PULL:
-
-					dx *= (
-						MAX_PULL / dist
-					)
-
-					dy *= (
-						MAX_PULL / dist
-					)
-
-				velocity = Vector2(
-					dx * SHOT_POWER,
-					dy * SHOT_POWER
-				)
-
-				turn_active = true
-
-				moves -= 1
-
-				update_move_icons()
+			launch_from_position(
+				release_actor.position
+			)
 
 
 func create_floor():
 
-	var floors = [
+	var floors = []
 
-		load("res://art/floor.png"),
+	if is_winter_level():
 
-		load("res://art/floor2.png"),
+		floors = [
+			load("res://art/floor4.png"),
+			load("res://art/floor5.png"),
+			load("res://art/floor6.png")
+		]
 
-		load("res://art/floor3.png")
-	]
+	else:
+
+		floors = [
+			load("res://art/floor.png"),
+			load("res://art/floor2.png"),
+			load("res://art/floor3.png")
+		]
 
 	for y in range(ROWS):
 
@@ -2388,7 +2939,9 @@ func create_floor():
 
 			tile.z_index = 10
 
-			add_child(tile) 
+			add_child(tile)
+
+			floor_tiles.append(tile)
 
 func create_level_buttons():
 
@@ -2408,7 +2961,13 @@ func create_level_buttons():
 
 		load("res://art/2H.png"),
 
-		load("res://art/3H.png")
+		load("res://art/3H.png"),
+
+		load("res://art/1S.png"),
+
+		load("res://art/2S.png"),
+
+		load("res://art/3S.png")
 
 	]
 
@@ -2416,10 +2975,21 @@ func create_level_buttons():
 
 		var button = Node2D.new()
 
-		button.position = Vector2(
-			1560 + i * 90,
-			235
-		)
+		if i < 4:
+
+			button.position = Vector2(
+				1560 + i * 90,
+				235
+			)
+
+		else:
+
+			# Winter levels sit directly under levels 1, 2, and 3, so the
+			# selector reads as one normal row and one snowy difficulty row.
+			button.position = Vector2(
+				1560 + (i - 3) * 90,
+				325
+			)
 
 		button.z_index = 500
 
@@ -2432,6 +3002,255 @@ func create_level_buttons():
 		add_child(button)
 
 		level_buttons.append(button)
+
+
+func create_enemy4_with_crystals(
+	used_cells: Dictionary
+):
+
+	var possible_rows = [
+		2,
+		3
+	]
+
+	var boss_cell = Vector2i(
+		1 + randi() % (COLS - 2),
+		possible_rows[
+			randi() % possible_rows.size()
+		]
+	)
+
+	enemy2 = Sprite2D.new()
+
+	enemy2.texture = load(
+		"res://art/enemy4.png"
+	)
+
+	enemy2.position = position_for_cell(
+		boss_cell
+	)
+
+	enemy2.z_index = 70
+
+	add_child(enemy2)
+
+	enemy2_alive = true
+
+	mark_used_cell(
+		used_cells,
+		boss_cell
+	)
+
+	for offset_x in range(-1, 2):
+
+		var crystal_cell = Vector2i(
+			boss_cell.x + offset_x,
+			boss_cell.y + 1
+		)
+
+		create_crystal(
+			crystal_cell.x,
+			crystal_cell.y
+		)
+
+		mark_used_cell(
+			used_cells,
+			crystal_cell
+		)
+
+
+func create_crystal(
+	x: int,
+	y: int
+):
+
+	var crystal = Sprite2D.new()
+
+	crystal.texture = load(
+		"res://art/crystal.png"
+	)
+
+	crystal.position = position_for_cell(
+		Vector2i(
+			x,
+			y
+		)
+	)
+
+	crystal.z_index = 65
+
+	add_child(crystal)
+
+	crystals.append(crystal)
+
+
+func create_gift(
+	used_cells: Dictionary
+):
+
+	var preferred_cell = Vector2i(
+		int(COLS / 2),
+		0
+	)
+
+	if is_cell_used(
+		used_cells,
+		preferred_cell
+	):
+
+		for x in range(COLS):
+
+			var candidate = Vector2i(
+				x,
+				0
+			)
+
+			if not is_cell_used(
+				used_cells,
+				candidate
+			):
+
+				preferred_cell = candidate
+
+				break
+
+	gift = Sprite2D.new()
+
+	gift.texture = load(
+		"res://art/gift.png"
+	)
+
+	gift.position = position_for_cell(
+		preferred_cell
+	)
+
+	gift.z_index = 58
+
+	add_child(gift)
+
+	mark_used_cell(
+		used_cells,
+		preferred_cell
+	)
+
+
+func collect_gift_if_needed(actor: Sprite2D):
+
+	if gift == null:
+		return
+
+	if not is_instance_valid(gift):
+		return
+
+	if actor == null:
+		return
+
+	if not overlap_cell(
+		actor.position,
+		gift.position
+	):
+		return
+
+	gift.queue_free()
+
+	gift = null
+
+	moves += 6
+
+	update_move_icons()
+
+
+func summon_enemy4_wall2_rectangles():
+
+	if current_level != LEVEL_3S:
+		return
+
+	if not enemy2_alive:
+		return
+
+	var used_cells = get_current_used_cells()
+
+	var rectangles_created = 0
+
+	while rectangles_created < 2:
+
+		if create_wall2_rectangle(
+			used_cells
+		):
+
+			rectangles_created += 1
+
+		else:
+
+			return
+
+
+func get_current_used_cells() -> Dictionary:
+
+	var used_cells = {}
+
+	for enemy in enemies:
+
+		if enemy != null and is_instance_valid(enemy):
+
+			mark_used_cell(
+				used_cells,
+				cell_for_position(enemy.position)
+			)
+
+	for wall in walls:
+
+		if wall != null and is_instance_valid(wall):
+
+			mark_used_cell(
+				used_cells,
+				cell_for_position(wall.position)
+			)
+
+	for trap in traps:
+
+		if trap != null and is_instance_valid(trap):
+
+			mark_used_cell(
+				used_cells,
+				cell_for_position(trap.position)
+			)
+
+	for star in stars:
+
+		if star != null and is_instance_valid(star):
+
+			mark_used_cell(
+				used_cells,
+				cell_for_position(star.position)
+			)
+
+	for crystal in crystals:
+
+		if crystal != null and is_instance_valid(crystal):
+
+			mark_used_cell(
+				used_cells,
+				cell_for_position(crystal.position)
+			)
+
+	if enemy2 != null and is_instance_valid(enemy2):
+
+		mark_used_cell(
+			used_cells,
+			cell_for_position(enemy2.position)
+		)
+
+	if gift != null and is_instance_valid(gift):
+
+		mark_used_cell(
+			used_cells,
+			cell_for_position(gift.position)
+		)
+
+	return used_cells
+
+
 func create_enemy2():
 
 	var possible_rows = [
@@ -2465,7 +3284,7 @@ func create_enemy2():
 
 	add_child(enemy2)
 
-	enemy2_alive = true 
+	enemy2_alive = true
 
 func create_random_trap():
 
@@ -2523,11 +3342,29 @@ func create_random_trap():
 
 				blocked = true
 
+		for crystal in crystals:
+
+			if crystal != null and overlap_cell(
+				pos,
+				crystal.position
+			):
+
+				blocked = true
+
 		if enemy2 != null:
 
 			if overlap_cell(
 				pos,
 				enemy2.position
+			):
+
+				blocked = true
+
+		if gift != null:
+
+			if overlap_cell(
+				pos,
+				gift.position
 			):
 
 				blocked = true
@@ -2563,7 +3400,11 @@ func create_character_buttons():
 
 		load("res://art/player7.png"),
 
-		load("res://art/player8.png")
+		load("res://art/player8.png"),
+
+		load("res://art/player9.png"),
+
+		load("res://art/player10.png")
 
 	]
 
@@ -2587,6 +3428,469 @@ func create_character_buttons():
 		add_child(icon)
 
 		character_buttons.append(icon)
+
+
+func get_penguin_start_positions() -> Array:
+
+	var offset = (
+		CELL * 1.5
+	)
+
+	return [
+		Vector2(
+			PLAYER_START_X - offset,
+			PLAYER_START_Y
+		),
+		Vector2(
+			PLAYER_START_X + offset,
+			PLAYER_START_Y
+		)
+	]
+
+
+func create_penguins():
+
+	var start_positions = get_penguin_start_positions()
+
+	for start_position in start_positions:
+
+		var penguin = Sprite2D.new()
+
+		penguin.texture = load(
+			"res://art/player9.png"
+		)
+
+		penguin.position = start_position
+
+		penguin.z_index = 100
+
+		add_child(penguin)
+
+		penguins.append(penguin)
+
+		penguin_velocities.append(
+			Vector2.ZERO
+		)
+
+		penguin_alive.append(true)
+
+
+func reset_penguins_for_next_turn():
+
+	var start_positions = get_penguin_start_positions()
+
+	for i in range(penguins.size()):
+
+		if i >= start_positions.size():
+			continue
+
+		if penguins[i] == null:
+			continue
+
+		if penguin_alive[i]:
+
+			penguins[i].position = start_positions[i]
+
+			penguins[i].visible = true
+
+		penguin_velocities[i] = Vector2.ZERO
+
+
+func has_alive_penguin() -> bool:
+
+	for alive in penguin_alive:
+
+		if alive:
+			return true
+
+	return false
+
+
+func are_penguins_moving() -> bool:
+
+	for penguin_velocity in penguin_velocities:
+
+		if penguin_velocity.length() > MIN_SPEED:
+			return true
+
+	return false
+
+
+func process_penguin_motion():
+
+	for i in range(penguins.size()):
+
+		if not penguin_alive[i]:
+			continue
+
+		if penguins[i] == null:
+			continue
+
+		if penguin_velocities[i] == Vector2.ZERO:
+			continue
+
+		penguins[i].position += penguin_velocities[i]
+
+		penguin_velocities[i] *= FRICTION
+
+		penguin_velocities[i] = bounce_actor_from_borders(
+			penguins[i],
+			penguin_velocities[i]
+		)
+
+		penguin_velocities[i] = bounce_actor_from_obstacles(
+			penguins[i],
+			penguin_velocities[i]
+		)
+
+		if (
+			abs(penguin_velocities[i].x) < MIN_SPEED
+			and
+			abs(penguin_velocities[i].y) < MIN_SPEED
+		):
+
+			penguin_velocities[i] = Vector2.ZERO
+
+
+func bounce_actor_from_borders(
+	actor: Sprite2D,
+	actor_velocity: Vector2
+) -> Vector2:
+
+	var left = (
+		LEFT_BORDER +
+		PLAYER_SIZE / 2
+	)
+
+	var right = (
+		RIGHT_BORDER -
+		PLAYER_SIZE / 2
+	)
+
+	var top = (
+		TOP_BORDER +
+		PLAYER_SIZE / 2
+	)
+
+	var bottom = (
+		BOTTOM_BORDER -
+		PLAYER_SIZE / 2
+	)
+
+	if actor.position.x < left:
+
+		actor.position.x = left
+
+		actor_velocity.x *= -0.8
+
+	if actor.position.x > right:
+
+		actor.position.x = right
+
+		actor_velocity.x *= -0.8
+
+	if actor.position.y < top:
+
+		actor.position.y = top
+
+		actor_velocity.y *= -0.8
+
+	if actor.position.y > bottom:
+
+		actor.position.y = bottom
+
+		actor_velocity.y *= -0.8
+
+	return actor_velocity
+
+
+func bounce_actor_from_obstacles(
+	actor: Sprite2D,
+	actor_velocity: Vector2
+) -> Vector2:
+
+	for obstacle in get_solid_obstacles():
+
+		if obstacle == null:
+			continue
+
+		if not overlap_cell(
+			actor.position,
+			obstacle.position
+		):
+			continue
+
+		var dx = (
+			actor.position.x -
+			obstacle.position.x
+		)
+
+		var dy = (
+			actor.position.y -
+			obstacle.position.y
+		)
+
+		if abs(dx) > abs(dy):
+
+			actor_velocity.x *= -0.8
+
+			actor.position.x += (
+				sign(dx) * 4
+			)
+
+		else:
+
+			actor_velocity.y *= -0.8
+
+			actor.position.y += (
+				sign(dy) * 4
+			)
+
+	return actor_velocity
+
+
+func get_active_penguin():
+
+	if penguins.is_empty():
+		return null
+
+	if (
+		active_penguin_index >= 0
+		and
+		active_penguin_index < penguins.size()
+		and
+		penguin_alive[active_penguin_index]
+	):
+
+		return penguins[active_penguin_index]
+
+	for i in range(penguins.size()):
+
+		if penguin_alive[i]:
+
+			active_penguin_index = i
+
+			return penguins[i]
+
+	return null
+
+
+func get_launch_actor_at_position(
+	click_position: Vector2
+):
+
+	if current_character == PLAYER_9:
+
+		for i in range(penguins.size()):
+
+			if not penguin_alive[i]:
+				continue
+
+			if penguins[i] == null:
+				continue
+
+			if click_position.distance_to(
+				penguins[i].position
+			) <= PLAYER_SIZE / 2:
+
+				active_penguin_index = i
+
+				return penguins[i]
+
+		return null
+
+	var half_x = (
+		PLAYER_SIZE / 2
+	)
+
+	var half_y = (
+		PLAYER_SIZE / 2
+	)
+
+	if (
+		click_position.x >= player.position.x - half_x
+		and
+		click_position.x <= player.position.x + half_x
+		and
+		click_position.y >= player.position.y - half_y
+		and
+		click_position.y <= player.position.y + half_y
+	):
+
+		return player
+
+	return null
+
+
+func launch_from_position(
+	release_launch_pos: Vector2
+) -> bool:
+
+	var launch_velocity = get_launch_velocity(
+		release_launch_pos,
+		mouse_pos
+	)
+
+	if launch_velocity == Vector2.ZERO:
+		return false
+
+	if current_character == PLAYER_9:
+
+		for i in range(penguin_velocities.size()):
+
+			if penguin_alive[i]:
+
+				penguin_velocities[i] = launch_velocity
+
+	else:
+
+		velocity = launch_velocity
+
+		if current_character == PLAYER_10:
+
+			snail_launch_start_position = player.position
+
+	turn_active = true
+
+	moves -= 1
+
+	update_move_icons()
+
+	return true
+
+
+func handle_snail_trail_input():
+
+	if Input.is_action_just_pressed("ui_left"):
+
+		move_snail_on_trail(
+			Vector2i(-1, 0)
+		)
+
+	if Input.is_action_just_pressed("ui_right"):
+
+		move_snail_on_trail(
+			Vector2i(1, 0)
+		)
+
+	if Input.is_action_just_pressed("ui_up"):
+
+		move_snail_on_trail(
+			Vector2i(0, -1)
+		)
+
+	if Input.is_action_just_pressed("ui_down"):
+
+		move_snail_on_trail(
+			Vector2i(0, 1)
+		)
+
+
+func move_snail_on_trail(direction: Vector2i) -> bool:
+
+	if current_character != PLAYER_10:
+		return false
+
+	if snail_trail_cells.is_empty():
+		return false
+
+	var current_cell = cell_for_position(
+		player.position
+	)
+
+	var target_cell = current_cell + direction
+
+	if not snail_trail_cells.has(target_cell):
+		return false
+
+	player.position = position_for_cell(
+		target_cell
+	)
+
+	return true
+
+
+func record_snail_trail_from_first_launch():
+
+	if current_character != PLAYER_10:
+		return
+
+	if snail_first_launch_recorded:
+		return
+
+	var start_cell = cell_for_position(
+		snail_launch_start_position
+	)
+
+	var end_cell = cell_for_position(
+		player.position
+	)
+
+	var dx = end_cell.x - start_cell.x
+
+	var dy = end_cell.y - start_cell.y
+
+	var steps = maxi(
+		abs(dx),
+		abs(dy)
+	)
+
+	if steps == 0:
+
+		add_snail_trail_cell(
+			start_cell
+		)
+
+	else:
+
+		for step in range(steps + 1):
+
+			var t = float(step) / float(steps)
+
+			var trail_cell = Vector2i(
+				int(round(lerp(start_cell.x, end_cell.x, t))),
+				int(round(lerp(start_cell.y, end_cell.y, t)))
+			)
+
+			add_snail_trail_cell(
+				trail_cell
+			)
+
+	snail_first_launch_recorded = true
+
+
+func add_snail_trail_cell(cell: Vector2i):
+
+	if snail_trail_cells.has(cell):
+		return
+
+	snail_trail_cells.append(cell)
+
+	var trail_tile = ColorRect.new()
+
+	trail_tile.size = Vector2(
+		CELL * 0.72,
+		CELL * 0.72
+	)
+
+	# Muted ochre keeps the snail trail visible without fighting the board art.
+	trail_tile.color = Color(
+		0.78,
+		0.58,
+		0.26,
+		0.42
+	)
+
+	trail_tile.position = (
+		position_for_cell(cell) -
+		trail_tile.size / 2
+	)
+
+	trail_tile.z_index = 25
+
+	add_child(trail_tile)
+
+	snail_trail_tiles.append(trail_tile)
 		
 func setup_character():
 
@@ -2632,6 +3936,22 @@ func setup_character():
 			player.texture = load(
 				"res://art/player8.png"
 			)
+
+		PLAYER_9:
+
+			player.texture = load(
+				"res://art/player9.png"
+			)
+
+		PLAYER_10:
+
+			player.texture = load(
+				"res://art/player10.png"
+			)
+
+	player.visible = (
+		current_character != PLAYER_9
+	)
 	
 func gorilla_hit_wall(
 	wall,

@@ -25,18 +25,18 @@ func _initialize():
 	)
 
 	_assert_level_zero_rule(
-		main.walls.size() == 0,
-		"Level 0 should not spawn walls."
+		main.walls.size() == 1,
+		"Level 0 should spawn exactly one wall."
 	)
 
 	_assert_level_zero_rule(
-		main.traps.size() == 0,
-		"Level 0 should not spawn traps."
+		main.traps.size() == 1,
+		"Level 0 should spawn exactly one trap."
 	)
 
 	_assert_level_zero_rule(
-		main.stars.size() == 0,
-		"Level 0 should not spawn stars."
+		main.stars.size() == 1,
+		"Level 0 should spawn exactly one star."
 	)
 
 	_assert_level_zero_rule(
