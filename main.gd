@@ -3258,7 +3258,73 @@ func get_current_used_cells() -> Dictionary:
 			cell_for_position(gift.position)
 		)
 
+	mark_active_player_cells(
+		used_cells
+	)
+
 	return used_cells
+
+
+func mark_active_player_cells(
+	used_cells: Dictionary
+):
+
+	# Level effects are created before the player resets for the next turn.
+	# Marking active character cells here prevents enemies from spawning traps
+	# or walls directly under the character that just stopped moving.
+	if (
+		player != null
+		and
+		is_instance_valid(player)
+		and
+		player.visible
+	):
+
+		mark_used_cell(
+			used_cells,
+			cell_for_position(player.position)
+		)
+
+	for i in range(penguins.size()):
+
+		if i >= penguin_alive.size():
+			continue
+
+		if not penguin_alive[i]:
+			continue
+
+		var penguin = penguins[i]
+
+		if (
+			penguin == null
+			or
+			not is_instance_valid(penguin)
+			or
+			not penguin.visible
+		):
+
+			continue
+
+		mark_used_cell(
+			used_cells,
+			cell_for_position(penguin.position)
+		)
+
+
+func is_cell_occupied_by_active_player(
+	cell: Vector2i
+) -> bool:
+
+	var used_cells = {}
+
+	mark_active_player_cells(
+		used_cells
+	)
+
+	return is_cell_used(
+		used_cells,
+		cell
+	)
 
 
 func create_enemy2():
@@ -3304,6 +3370,11 @@ func create_random_trap():
 
 		var y = randi() % ROWS
 
+		var trap_cell = Vector2i(
+			x,
+			y
+		)
+
 		var pos = Vector2(
 			LEFT_BORDER +
 			x * CELL +
@@ -3315,6 +3386,12 @@ func create_random_trap():
 		)
 
 		var blocked = false
+
+		if is_cell_occupied_by_active_player(
+			trap_cell
+		):
+
+			blocked = true
 
 		for trap in traps:
 
@@ -4298,16 +4375,101 @@ func gorilla_hit_wall(
 	if index == -1:
 		return
 
-	wall_velocities[index] += (
+	var push_velocity = (
 		hit_velocity *
 		GORILLA_PUSH_POWER
 	)
+
+	for touching_wall_index in get_touching_wall_group_indices(
+		index
+	):
+
+		if touching_wall_index >= wall_velocities.size():
+			continue
+
+		wall_velocities[touching_wall_index] += push_velocity
 
 	play_gorilla_push_animation(
 		wall.position,
 		true,
 		GORILLA_PUSH_POST_COLLISION_SECONDS
 	)
+
+
+func get_touching_wall_group_indices(
+	start_index: int
+) -> Array:
+
+	# Wall and wall2 tiles can touch each other. The gorilla should push the
+	# whole connected block at once; otherwise one tile can slide over another.
+	var group = []
+	var pending = [
+		start_index
+	]
+
+	while not pending.is_empty():
+
+		var current_index = pending.pop_back()
+
+		if group.has(current_index):
+			continue
+
+		if (
+			current_index < 0
+			or
+			current_index >= walls.size()
+		):
+
+			continue
+
+		var current_wall = walls[current_index]
+
+		if (
+			current_wall == null
+			or
+			not is_instance_valid(current_wall)
+		):
+
+			continue
+
+		group.append(current_index)
+
+		var current_cell = cell_for_position(
+			current_wall.position
+		)
+
+		for other_index in range(walls.size()):
+
+			if group.has(other_index):
+				continue
+
+			if pending.has(other_index):
+				continue
+
+			var other_wall = walls[other_index]
+
+			if (
+				other_wall == null
+				or
+				not is_instance_valid(other_wall)
+			):
+
+				continue
+
+			var other_cell = cell_for_position(
+				other_wall.position
+			)
+
+			var grid_distance = (
+				abs(current_cell.x - other_cell.x) +
+				abs(current_cell.y - other_cell.y)
+			)
+
+			if grid_distance == 1:
+
+				pending.append(other_index)
+
+	return group
 
 
 func preview_gorilla_push_animation(

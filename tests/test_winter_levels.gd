@@ -172,6 +172,38 @@ func _initialize():
 		"Summoned 3S wall2 tiles should also form clean two-tile rectangles."
 	)
 
+	main.start_new_game()
+
+	var player_cell = Vector2i(4, 4)
+
+	main.player.position = main.position_for_cell(
+		player_cell
+	)
+
+	var used_cells = main.get_current_used_cells()
+
+	_assert_winter_rule(
+		used_cells.has(main.cell_key(player_cell.x, player_cell.y)),
+		"Generated level effects should treat the main player cell as occupied."
+	)
+
+	main.current_character = main.PLAYER_9
+	main.setup_character()
+	main.start_new_game()
+
+	var penguin_cell = Vector2i(5, 4)
+
+	main.penguins[0].position = main.position_for_cell(
+		penguin_cell
+	)
+
+	var penguin_used_cells = main.get_current_used_cells()
+
+	_assert_winter_rule(
+		penguin_used_cells.has(main.cell_key(penguin_cell.x, penguin_cell.y)),
+		"Generated level effects should treat living penguin cells as occupied."
+	)
+
 	main.queue_free()
 	quit(1 if failed else 0)
 
