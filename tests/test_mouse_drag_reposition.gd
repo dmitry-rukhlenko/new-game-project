@@ -25,7 +25,7 @@ func _initialize():
 	main.dragging = true
 	main.drag_start = start_position
 	main.drag_launch_position = start_position
-	main.mouse_pos = start_position + Vector2(120, 12)
+	main.mouse_pos = start_position + Vector2(120, 2)
 	main.update_dragged_player_position()
 
 	_assert_drag_rule(
@@ -40,7 +40,7 @@ func _initialize():
 
 	var repositioned_x = main.player.position.x
 
-	main.mouse_pos = start_position + Vector2(180, 80)
+	main.mouse_pos = start_position + Vector2(180, 4)
 	main.update_dragged_player_position()
 
 	_assert_drag_rule(
@@ -57,7 +57,7 @@ func _initialize():
 	main.dragging = true
 	main.drag_start = sparrow_position
 	main.drag_launch_position = sparrow_position
-	main.mouse_pos = sparrow_position + Vector2(120, 12)
+	main.mouse_pos = sparrow_position + Vector2(120, 2)
 	main.update_dragged_player_position()
 
 	_assert_drag_rule(
